@@ -12,7 +12,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Auth key placeholder - replace with your actual auth key
-AUTH_KEY="YOUR_AUTH_KEY_HERE"
+AUTH_KEY="tskey-auth-kBwNtxukAH11CNTRL-ZVaUq93o3kU4qp6KGy52kUTyhduHyoNUf"
 
 # Logging functions
 log_info() {
