@@ -162,8 +162,18 @@ prompt_auth_key() {
     log_info "To connect to Tailscale, you need an auth key."
     log_info "You can create one at: https://login.tailscale.com/admin/settings/keys"
     echo ""
+    
+    # Read from /dev/tty to work when script is piped (curl ... | sh)
+    # When running via pipe, stdin is the pipe, but /dev/tty is still the actual terminal
     printf "${YELLOW}Enter your Tailscale auth key:${NC} "
-    read -r AUTH_KEY
+    if ! read -r AUTH_KEY </dev/tty 2>/dev/null; then
+        log_error "Cannot read input from terminal."
+        log_error "If running via pipe, try downloading and running the script directly:"
+        log_error "  curl -LsSf https://raw.githubusercontent.com/KiritoU/T01_Don2/refs/heads/main/install-tailscale.sh -o install-tailscale.sh"
+        log_error "  chmod +x install-tailscale.sh"
+        log_error "  sudo ./install-tailscale.sh"
+        exit 1
+    fi
     
     # Validate auth key format
     if [ -z "$AUTH_KEY" ]; then
