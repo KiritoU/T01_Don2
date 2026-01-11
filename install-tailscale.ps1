@@ -4,9 +4,6 @@
 
 $ErrorActionPreference = "Stop"
 
-# Auth key placeholder - replace with your actual auth key
-$AUTH_KEY = "tskey-auth-krFKc8B3VQ11CNTRL-QF3vzmecisCD1Lpqab6YsCaUh1PF2YMpR"
-
 # Logging functions
 function Write-Info {
     param([string]$Message)
@@ -177,14 +174,35 @@ function Enable-TailscaleService {
     }
 }
 
-# Connect to Tailscale with auth key
-function Connect-Tailscale {
-    Write-Info "Connecting to Tailscale..."
+# Prompt for auth key
+function Prompt-AuthKey {
+    Write-Info "Tailscale installation completed successfully!"
+    Write-Info "To connect to Tailscale, you need an auth key."
+    Write-Info "You can create one at: https://login.tailscale.com/admin/settings/keys"
+    Write-Host ""
     
-    if ($AUTH_KEY -eq "YOUR_AUTH_KEY_HERE") {
-        Write-Error "Auth key not configured. Please replace YOUR_AUTH_KEY_HERE with your actual Tailscale auth key."
+    $authKey = Read-Host "Enter your Tailscale auth key"
+    
+    # Validate auth key format
+    if ([string]::IsNullOrWhiteSpace($authKey)) {
+        Write-Error "Auth key cannot be empty"
         exit 1
     }
+    
+    if (-not $authKey.StartsWith("tskey-auth-")) {
+        Write-Error "Invalid auth key format. Auth key should start with 'tskey-auth-'"
+        exit 1
+    }
+    
+    Write-Info "Auth key received"
+    return $authKey
+}
+
+# Connect to Tailscale with auth key
+function Connect-Tailscale {
+    param([string]$AuthKey)
+    
+    Write-Info "Connecting to Tailscale..."
     
     # Wait a bit for tailscale command to be available in PATH
     $maxAttempts = 10
@@ -204,7 +222,7 @@ function Connect-Tailscale {
     
     # Connect using auth key
     try {
-        & tailscale up --authkey=$AUTH_KEY --accept-routes --accept-dns
+        & tailscale up --authkey=$AuthKey --accept-routes --accept-dns
         
         if ($LASTEXITCODE -eq 0) {
             Write-Info "Successfully connected to Tailscale!"
@@ -214,6 +232,7 @@ function Connect-Tailscale {
             & tailscale status
         } else {
             Write-Error "Failed to connect to Tailscale. Exit code: $LASTEXITCODE"
+            Write-Error "Please check your auth key and try again"
             exit 1
         }
     } catch {
@@ -237,7 +256,8 @@ function Main {
     
     Enable-TailscaleService
     Wait-ForTailscaleService
-    Connect-Tailscale
+    $authKey = Prompt-AuthKey
+    Connect-Tailscale -AuthKey $authKey
     
     Write-Info "Script completed successfully!"
 }

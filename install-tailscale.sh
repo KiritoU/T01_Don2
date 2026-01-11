@@ -11,9 +11,6 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Auth key placeholder - replace with your actual auth key
-AUTH_KEY="tskey-auth-k76TUKz9VM11CNTRL-jRF4zLjZGCe2BYxp9g36Ce3z3oRw2wK5"
-
 # Logging functions
 log_info() {
     printf "${GREEN}[INFO]${NC} %s\n" "$1"
@@ -159,19 +156,35 @@ setup_service() {
     fi
 }
 
+# Prompt for auth key
+prompt_auth_key() {
+    log_info "Tailscale installation completed successfully!"
+    log_info "To connect to Tailscale, you need an auth key."
+    log_info "You can create one at: https://login.tailscale.com/admin/settings/keys"
+    echo ""
+    printf "${YELLOW}Enter your Tailscale auth key:${NC} "
+    read -r AUTH_KEY
+    
+    # Validate auth key format
+    if [ -z "$AUTH_KEY" ]; then
+        log_error "Auth key cannot be empty"
+        exit 1
+    fi
+    
+    if ! echo "$AUTH_KEY" | grep -q "^tskey-auth-"; then
+        log_error "Invalid auth key format. Auth key should start with 'tskey-auth-'"
+        exit 1
+    fi
+    
+    log_info "Auth key received"
+}
+
 # Connect to Tailscale with auth key
 connect_tailscale() {
     log_info "Connecting to Tailscale..."
     
-    if [ "$AUTH_KEY" = "YOUR_AUTH_KEY_HERE" ]; then
-        log_error "Auth key not configured. Please replace YOUR_AUTH_KEY_HERE with your actual Tailscale auth key."
-        exit 1
-    fi
-    
     # Connect using auth key
-    tailscale up --authkey="$AUTH_KEY" --accept-routes --accept-dns
-    
-    if [ $? -eq 0 ]; then
+    if tailscale up --authkey="$AUTH_KEY" --accept-routes --accept-dns; then
         log_info "Successfully connected to Tailscale!"
         
         # Display Tailscale status
@@ -179,6 +192,7 @@ connect_tailscale() {
         tailscale status
     else
         log_error "Failed to connect to Tailscale"
+        log_error "Please check your auth key and try again"
         exit 1
     fi
 }
@@ -197,6 +211,7 @@ main() {
     fi
     
     setup_service
+    prompt_auth_key
     connect_tailscale
     
     log_info "Script completed successfully!"

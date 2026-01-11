@@ -21,23 +21,36 @@ Scripts tự động cài đặt và kết nối Tailscale cho Linux và Windows
 - PowerShell 5.1 hoặc cao hơn
 - Windows 10/11 hoặc Windows Server
 
-## Cài đặt Auth Key
+## Auth Key
 
-**Quan trọng**: Trước khi sử dụng, bạn cần thay thế `YOUR_AUTH_KEY_HERE` trong các script bằng auth key thực tế của bạn.
+Script sẽ tự động yêu cầu bạn nhập Tailscale auth key sau khi cài đặt Tailscale thành công.
 
-1. Tạo auth key từ [Tailscale Admin Console](https://login.tailscale.com/admin/settings/keys)
-2. Mở file script tương ứng
-3. Tìm và thay thế `YOUR_AUTH_KEY_HERE` bằng auth key của bạn
+**Tạo Auth Key:**
+1. Truy cập [Tailscale Admin Console](https://login.tailscale.com/admin/settings/keys)
+2. Click "Generate auth key"
+3. Cấu hình các tùy chọn:
+   - **Reusable**: Bật nếu muốn dùng cho nhiều thiết bị
+   - **Ephemeral**: Tắt (trừ khi cần)
+   - **Expiry**: Đặt thời gian hết hạn phù hợp
+   - **Preauthorized**: Bật để tự động kết nối
+4. Copy auth key (bắt đầu bằng `tskey-auth-...`)
+
+**Lưu ý bảo mật:**
+- Auth key không được lưu trong script để tránh lộ khi push lên GitHub
+- Script sẽ validate format của auth key trước khi sử dụng
+- Auth key chỉ được sử dụng một lần để kết nối, không được lưu trữ
 
 ## Sử dụng
 
 ### Linux
 
-Chạy script trực tiếp từ GitHub (sau khi đã cập nhật auth key và push lên GitHub):
+Chạy script trực tiếp từ GitHub:
 
 ```bash
 curl -LsSf https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/install-tailscale.sh | sh
 ```
+
+Script sẽ tự động yêu cầu bạn nhập Tailscale auth key sau khi cài đặt thành công.
 
 Hoặc chạy local:
 
@@ -48,11 +61,13 @@ sudo ./install-tailscale.sh
 
 ### Windows
 
-Chạy script trực tiếp từ GitHub (sau khi đã cập nhật auth key và push lên GitHub):
+Chạy script trực tiếp từ GitHub:
 
 ```powershell
 irm https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/install-tailscale.ps1 | iex
 ```
+
+Script sẽ tự động yêu cầu bạn nhập Tailscale auth key sau khi cài đặt thành công.
 
 Hoặc chạy local (với quyền Administrator):
 
@@ -73,8 +88,10 @@ Script bash thực hiện các bước sau:
 4. Cài đặt Tailscale nếu chưa có (sử dụng official install script)
 5. Enable `tailscaled` service để tự động khởi động khi reboot
 6. Start `tailscaled` service
-7. Kết nối với Tailscale sử dụng auth key
-8. Hiển thị trạng thái kết nối
+7. Yêu cầu người dùng nhập Tailscale auth key
+8. Validate format của auth key
+9. Kết nối với Tailscale sử dụng auth key
+10. Hiển thị trạng thái kết nối
 
 **Hỗ trợ package managers:**
 - Ubuntu/Debian: `apt`
@@ -92,16 +109,20 @@ Script PowerShell thực hiện các bước sau:
    - Ưu tiên sử dụng `winget` (Windows 10+)
    - Fallback: Download installer từ tailscale.com
 5. Đảm bảo Tailscale service được enable và running
-6. Kết nối với Tailscale sử dụng auth key
-7. Hiển thị trạng thái kết nối
+6. Yêu cầu người dùng nhập Tailscale auth key
+7. Validate format của auth key
+8. Kết nối với Tailscale sử dụng auth key
+9. Hiển thị trạng thái kết nối
 
 ## Bảo mật
 
-**Lưu ý quan trọng về bảo mật:**
+**Các biện pháp bảo mật:**
 
-- Hiện tại auth key được hardcode trong script (placeholder)
-- **Không commit auth key thực tế lên GitHub public repository**
-- Trong tương lai sẽ có giải pháp bảo mật tốt hơn (env variables, secure key distribution)
+- Auth key không được hardcode trong script
+- Auth key được yêu cầu nhập tương tác sau khi cài đặt
+- Script validate format của auth key trước khi sử dụng
+- Auth key không được lưu trữ trong script hoặc log files
+- An toàn để commit và push script lên GitHub public repository
 
 ## Troubleshooting
 
