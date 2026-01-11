@@ -16,20 +16,20 @@ AUTH_KEY="tskey-auth-kBwNtxukAH11CNTRL-ZVaUq93o3kU4qp6KGy52kUTyhduHyoNUf"
 
 # Logging functions
 log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+    printf "${GREEN}[INFO]${NC} %s\n" "$1"
 }
 
 log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+    printf "${YELLOW}[WARN]${NC} %s\n" "$1"
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    printf "${RED}[ERROR]${NC} %s\n" "$1"
 }
 
 # Check if running as root or with sudo
 check_root() {
-    if [ "$EUID" -ne 0 ]; then
+    if [ "$(id -u)" -ne 0 ]; then
         log_error "This script must be run as root or with sudo"
         exit 1
     fi
@@ -51,11 +51,20 @@ detect_distro() {
 
 # Check if Tailscale is already installed
 is_tailscale_installed() {
-    if command -v tailscale &> /dev/null || systemctl list-unit-files | grep -q tailscaled; then
+    # Check if tailscale command exists
+    if command -v tailscale >/dev/null 2>&1; then
         return 0
-    else
-        return 1
     fi
+    
+    # Check if tailscaled service exists and is properly installed
+    if systemctl list-unit-files 2>/dev/null | grep -q "^tailscaled.service"; then
+        # Verify the service file actually exists
+        if [ -f /etc/systemd/system/tailscaled.service ] || [ -f /usr/lib/systemd/system/tailscaled.service ] || [ -f /lib/systemd/system/tailscaled.service ]; then
+            return 0
+        fi
+    fi
+    
+    return 1
 }
 
 # Install Tailscale based on distribution
@@ -72,10 +81,10 @@ install_tailscale() {
             ;;
         rhel|centos|fedora|rocky|almalinux)
             log_info "Using yum/dnf package manager"
-            if command -v dnf &> /dev/null; then
+            if command -v dnf >/dev/null 2>&1; then
                 dnf install -y curl
                 curl -fsSL https://tailscale.com/install.sh | sh
-            elif command -v yum &> /dev/null; then
+            elif command -v yum >/dev/null 2>&1; then
                 yum install -y curl
                 curl -fsSL https://tailscale.com/install.sh | sh
             else
@@ -102,24 +111,50 @@ install_tailscale() {
 setup_service() {
     log_info "Setting up Tailscale service..."
     
+    # Check if service exists
+    if ! systemctl list-unit-files 2>/dev/null | grep -q "^tailscaled.service"; then
+        log_error "tailscaled service not found. Tailscale may not be installed correctly."
+        log_info "Attempting to reinstall Tailscale..."
+        install_tailscale
+        # Reload systemd after installation
+        systemctl daemon-reload
+        sleep 2
+    fi
+    
     # Enable service to start on boot
-    systemctl enable tailscaled
-    log_info "Tailscale service enabled for auto-start on boot"
+    if systemctl enable tailscaled 2>/dev/null; then
+        log_info "Tailscale service enabled for auto-start on boot"
+    else
+        # Check if already enabled
+        if systemctl is-enabled tailscaled >/dev/null 2>&1; then
+            log_info "Tailscale service is already enabled"
+        else
+            log_warn "Failed to enable tailscaled service"
+        fi
+    fi
     
     # Start the service
-    systemctl start tailscaled
-    log_info "Tailscale service started"
+    if systemctl start tailscaled 2>/dev/null; then
+        log_info "Tailscale service started"
+    else
+        # Check if already running
+        if systemctl is-active --quiet tailscaled 2>/dev/null; then
+            log_info "Tailscale service is already running"
+        else
+            log_warn "Failed to start tailscaled service"
+        fi
+    fi
     
     # Wait for service to be ready
     log_info "Waiting for Tailscale service to be ready..."
     sleep 3
     
     # Verify service is running
-    if systemctl is-active --quiet tailscaled; then
+    if systemctl is-active --quiet tailscaled 2>/dev/null; then
         log_info "Tailscale service is running"
     else
         log_error "Tailscale service failed to start"
-        systemctl status tailscaled
+        systemctl status tailscaled || true
         exit 1
     fi
 }
