@@ -189,9 +189,40 @@ prompt_auth_key() {
     log_info "Auth key received"
 }
 
+# Disconnect from Tailscale if already connected
+disconnect_tailscale() {
+    log_info "Checking current Tailscale connection status..."
+    
+    # Check if Tailscale is already connected
+    if tailscale status >/dev/null 2>&1; then
+        local status_output=$(tailscale status 2>/dev/null | head -1)
+        if [ -n "$status_output" ] && echo "$status_output" | grep -qE "^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+"; then
+            log_warn "Tailscale is already connected. Disconnecting to switch account..."
+            tailscale down
+            sleep 2
+            
+            # Remove state to fully reset connection and switch to new account
+            log_info "Removing Tailscale state to fully reset connection..."
+            rm -f /var/lib/tailscale/tailscaled.state
+            systemctl restart tailscaled
+            sleep 3
+            
+            # Verify service is running after restart
+            if systemctl is-active --quiet tailscaled 2>/dev/null; then
+                log_info "Tailscale service restarted successfully"
+            else
+                log_warn "Tailscale service may not be ready yet"
+            fi
+        fi
+    fi
+}
+
 # Connect to Tailscale with auth key
 connect_tailscale() {
     log_info "Connecting to Tailscale..."
+    
+    # Disconnect if already connected
+    disconnect_tailscale
     
     # Connect using auth key
     if tailscale up --authkey="$AUTH_KEY" --accept-routes --accept-dns; then

@@ -198,11 +198,97 @@ function Prompt-AuthKey {
     return $authKey
 }
 
+# Disconnect from Tailscale if already connected
+function Disconnect-Tailscale {
+    Write-Info "Checking current Tailscale connection status..."
+    
+    # Wait a bit for tailscale command to be available in PATH
+    $maxAttempts = 10
+    $attempt = 0
+    while ($attempt -lt $maxAttempts) {
+        if (Get-Command tailscale -ErrorAction SilentlyContinue) {
+            break
+        }
+        Start-Sleep -Seconds 1
+        $attempt++
+    }
+    
+    if (Get-Command tailscale -ErrorAction SilentlyContinue) {
+        try {
+            $statusOutput = & tailscale status 2>&1
+            if ($LASTEXITCODE -eq 0 -and $statusOutput) {
+                # Check if there's a connected device (status shows IP address)
+                $firstLine = ($statusOutput -split "`n")[0]
+                if ($firstLine -match "^\d+\.\d+\.\d+\.\d+") {
+                    Write-Warn "Tailscale is already connected. Disconnecting to switch account..."
+                    & tailscale down 2>&1 | Out-Null
+                    Start-Sleep -Seconds 2
+                    
+                    # Stop service before removing state files
+                    Write-Info "Stopping Tailscale service..."
+                    Stop-Service -Name "Tailscale" -Force -ErrorAction SilentlyContinue
+                    Start-Sleep -Seconds 2
+                    
+                    # Remove state to fully reset connection and switch to new account
+                    Write-Info "Removing Tailscale state files to fully reset connection..."
+                    
+                    # Remove state file in ProgramData
+                    $statePath = "$env:ProgramData\Tailscale\tailscaled.state"
+                    if (Test-Path $statePath) {
+                        Remove-Item $statePath -Force -ErrorAction SilentlyContinue
+                        Write-Info "Removed: $statePath"
+                    }
+                    
+                    # Remove state directory in ProgramData (may contain other files)
+                    $stateDir = "$env:ProgramData\Tailscale"
+                    if (Test-Path $stateDir) {
+                        Get-ChildItem -Path $stateDir -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+                        Write-Info "Cleaned: $stateDir"
+                    }
+                    
+                    # Remove user-specific state (if exists)
+                    $userStatePath = "$env:LOCALAPPDATA\Tailscale"
+                    if (Test-Path $userStatePath) {
+                        Get-ChildItem -Path $userStatePath -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+                        Write-Info "Cleaned: $userStatePath"
+                    }
+                    
+                    # Remove system profile state (older versions)
+                    $systemStatePath = "$env:SystemRoot\System32\config\systemprofile\AppData\Local\Tailscale"
+                    if (Test-Path $systemStatePath) {
+                        Get-ChildItem -Path $systemStatePath -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+                        Write-Info "Cleaned: $systemStatePath"
+                    }
+                    
+                    # Start service again
+                    Write-Info "Starting Tailscale service..."
+                    Start-Service -Name "Tailscale" -ErrorAction SilentlyContinue
+                    Start-Sleep -Seconds 3
+                    
+                    # Verify service is running after restart
+                    $service = Get-Service -Name "Tailscale" -ErrorAction SilentlyContinue
+                    if ($service -and $service.Status -eq "Running") {
+                        Write-Info "Tailscale service restarted successfully"
+                    } else {
+                        Write-Warn "Tailscale service may not be ready yet"
+                    }
+                }
+            }
+        } catch {
+            # If status check fails, assume not connected
+            Write-Info "Tailscale appears to be disconnected"
+        }
+    }
+}
+
 # Connect to Tailscale with auth key
 function Connect-Tailscale {
     param([string]$AuthKey)
     
     Write-Info "Connecting to Tailscale..."
+    
+    # Disconnect if already connected
+    Disconnect-Tailscale
     
     # Wait a bit for tailscale command to be available in PATH
     $maxAttempts = 10
