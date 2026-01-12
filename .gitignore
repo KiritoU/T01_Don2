@@ -11,3 +11,7 @@ wheels/
 
 # Dev
 .cursor
+
+# Scripts with hardcoded auth keys (DO NOT COMMIT)
+install.sh
+install.ps1
