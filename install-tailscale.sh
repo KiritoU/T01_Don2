@@ -69,7 +69,7 @@ install_tailscale() {
     log_info "Installing Tailscale..."
     
     case $DISTRO in
-        ubuntu|debian)
+        ubuntu|debian|kali)
             log_info "Using apt package manager"
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
