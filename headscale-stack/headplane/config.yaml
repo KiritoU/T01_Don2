@@ -1,0 +1,35 @@
+server:
+  host: "0.0.0.0"
+  port: 3000
+
+  # Must be exactly 32 characters
+  cookie_secret: "ycEOGN6DGuZ064CaTFSI5ckBpXZUB5bP"
+  # You are using HTTPS via Traefik, so keep this true
+  cookie_secure: true
+
+headscale:
+  # Internal URL inside Docker network
+  url: "http://headscale:8080"
+  # Public URL for links (optional but recommended)
+  public_url: "https://headscale.dev2sec.io.vn"
+  config_path: "/etc/headscale/config.yaml"
+  dns_records_path: "/etc/headscale/dns_records.json"
+  # Enforce that config_path must be present and valid
+  config_strict: true
+
+integration:
+  docker:
+    enabled: true
+    # Headplane Docker integration style from example configs
+    container_name: "headscale"
+    socket: "unix:///var/run/docker.sock"
+
+auth:
+  local_admin:
+    enabled: true
+    username: "admin"
+    password: "ndsavu32ytafFACA"
+
+ui:
+  tailnet_name: "My Tailnet"
+  base_domain: "tailnet.dev2sec.io.vn"

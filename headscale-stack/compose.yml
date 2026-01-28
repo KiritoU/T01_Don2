@@ -1,0 +1,77 @@
+services:
+  headscale:
+    image: headscale/headscale:0.26.0
+    container_name: headscale
+    command: serve
+    restart: unless-stopped
+    volumes:
+      - ./headscale/config.yaml:/etc/headscale/config.yaml
+      - ./headscale/dns_records.json:/etc/headscale/dns_records.json
+      - ./headscale/data:/var/lib/headscale
+    labels:
+      - "me.tale.headplane.target=headscale"
+      - "traefik.enable=true"
+      - "traefik.http.routers.headscale.rule=Host(`headscale.dev2sec.io.vn`)"
+      - "traefik.http.routers.headscale.entrypoints=websecure"
+      - "traefik.http.routers.headscale.tls.certresolver=letsencrypt"
+      - "traefik.http.services.headscale.loadbalancer.server.port=8080"
+      # CORS middleware (required by Headplane)
+      - "traefik.http.routers.headscale.middlewares=cors"
+      - "traefik.http.middlewares.cors.headers.accesscontrolallowheaders=*"
+      - "traefik.http.middlewares.cors.headers.accesscontrolallowmethods=GET,POST,PUT"
+      - "traefik.http.middlewares.cors.headers.accesscontrolalloworiginlist=https://headplane.dev2sec.io.vn"
+
+  headplane:
+    image: ghcr.io/tale/headplane:latest
+    container_name: headplane
+    restart: unless-stopped
+    depends_on:
+      - headscale
+    volumes:
+      - ./headplane/config.yaml:/etc/headplane/config.yaml
+      - ./headplane/data:/var/lib/headplane
+      - ./headscale/config.yaml:/etc/headscale/config.yaml
+      - ./headscale/dns_records.json:/etc/headscale/dns_records.json
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.headplane.rule=Host(`headplane.dev2sec.io.vn`)"
+      - "traefik.http.routers.headplane.entrypoints=websecure"
+      - "traefik.http.routers.headplane.tls.certresolver=letsencrypt"
+      - "traefik.http.services.headplane.loadbalancer.server.port=3000"
+
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      # HTTP/HTTPS entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      
+      # Docker provider
+      - "--providers.docker=true"
+      - "--providers.docker.exposedByDefault=false"
+      
+      # Let's Encrypt HTTP challenge
+      - "--certificatesresolvers.letsencrypt.acme.email=duongnt.96@proton.me"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/acme/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      
+      # Logs
+      - "--log.level=INFO"
+      
+      # Dashboard (REMOVE after certs work)
+      # - "--api.dashboard=true"
+      # - "--api.insecure=true"
+    ports:
+      - "80:80"
+      - "443:443"
+      # - "8080:8080"  # Dashboard (REMOVE after certs work)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/acme:/acme
+
+networks:
+  default:
+    name: headscale-stack_default

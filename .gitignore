@@ -15,3 +15,6 @@ wheels/
 # Scripts with hardcoded auth keys (DO NOT COMMIT)
 install.sh
 install.ps1
+ephemeral.ps1
+ephemeral.sh
+# headscale-stack
